@@ -1,0 +1,15 @@
+{
+  "short_name": "ZKP2P Developer",
+  "name": "ZKP2P Developer Tool",
+  "icons": [
+    {
+      "src": "/static/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#171717",
+  "background_color": "#171717"
+}
