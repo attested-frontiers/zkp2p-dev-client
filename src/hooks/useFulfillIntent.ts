@@ -5,8 +5,8 @@ import { DEV_ADDRESSES, DEV_ACCOUNTS } from '../helpers/constants';
 import { parseExtensionProof } from '@helpers/types';
 
 type FulfillIntentResult = {
-    success: boolean;
-    error?: string;
+  success: boolean;
+  error?: string;
 };
 
 const dummyProof = {
@@ -163,45 +163,58 @@ const RPC_URL = 'http://localhost:8545';
 const PROOF_ENCODING_STRING = "(tuple(string provider, string parameters, string context) claimInfo, tuple(tuple(bytes32 identifier, address owner, uint32 timestampS, uint32 epoch) claim, bytes[] signatures) signedClaim, bool isAppclipProof)";
 
 const encodeProof = (proof: any) => {
-	return ethers.utils.defaultAbiCoder.encode(
-		[PROOF_ENCODING_STRING],
-		[proof]
-	);
+  return ethers.utils.defaultAbiCoder.encode(
+    [PROOF_ENCODING_STRING],
+    [proof]
+  );
 };
 
 
 export const useFulfillIntent = (selectedAccount: keyof typeof DEV_ACCOUNTS) => {
-    const [loading, setLoading] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const fulfillIntent = useCallback(async (intentHash: string, proxyProof: string): Promise<FulfillIntentResult> => {
-        setLoading(true);
-        setError(null);
+  const fulfillIntent = useCallback(async (intentHash: string, proxyProof: string): Promise<FulfillIntentResult> => {
+    setLoading(true);
+    setError(null);
 
-        try {
-            const proof = parseExtensionProof(JSON.parse(proxyProof)); // Validate the proof format
-            // const proof = parseExtensionProof(dummyProof); // Use dummy proof for testing
-            const encodedProof = encodeProof(proof)
-            const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
-            const wallet = new ethers.Wallet(DEV_ACCOUNTS[selectedAccount].priv, rpcProvider);
-            const escrowContract = new ethers.Contract(
-                DEV_ADDRESSES.Escrow,
-                EscrowABI.abi,
-                wallet
-            );
+    try {
+      const proof = parseExtensionProof(JSON.parse(proxyProof)); // Validate the proof format
+      console.log("Parsed Proof:", proof);
+      // const proof = parseExtensionProof(dummyProof); // Use dummy proof for testing
+      const encodedProof = encodeProof(proof)
+      console.log("Encoded Proof:", encodedProof);
+      const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
+      const wallet = new ethers.Wallet(DEV_ACCOUNTS[selectedAccount].priv, rpcProvider);
+      const escrowContract = new ethers.Contract(
+        DEV_ADDRESSES.Escrow,
+        EscrowABI.abi,
+        wallet
+      );
 
-            await escrowContract.fulfillIntent(encodedProof, intentHash);
+      const tx = await escrowContract.fulfillIntent(encodedProof, intentHash);
+      const receipt = await tx.wait();
+      const eventSignature = ethers.utils.id("FML(bytes32,bytes32)");
+      const fmlLog = receipt.logs.find((log: any) => log.topics[0] === eventSignature);
+      if (fmlLog) {
+        // topics[1] and topics[2] are the expected and actual hashes
+        const expectedHash = fmlLog.topics[1];
+        const actualHash = fmlLog.topics[2];
+        console.log("FML Event - Expected Hash:", expectedHash);
+        console.log("FML Event - Actual Hash:", actualHash);
+      } else {
+        console.log("FML event not found in transaction logs.");
+      }
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error('Failed to fulfill intent:', err);
+      setError('Failed to fulfill intent');
+      setLoading(false);
+      //@ts-ignore
+      return { success: false, error: err.message };
+    }
+  }, [selectedAccount]);
 
-            setLoading(false);
-            return { success: true };
-        } catch (err) {
-            console.error('Failed to fulfill intent:', err);
-            setError('Failed to fulfill intent');
-            setLoading(false);
-            //@ts-ignore
-            return { success: false, error: err.message };
-        }
-    }, [selectedAccount]);
-
-    return { fulfillIntent, loading, error };
+  return { fulfillIntent, loading, error };
 };

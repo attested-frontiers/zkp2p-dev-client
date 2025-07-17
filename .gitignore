@@ -31,3 +31,6 @@ build/
 .vscode
 ptau_files/
 .next
+
+samba2
+samba-ui
